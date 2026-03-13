@@ -1,14 +1,13 @@
 package be.vinci.resilience;
 
 public class Localisation {
-
-    private final String id;
+    private final long id; // On a changé String en long ici
     private final double latitude;
     private final double longitude;
     private final String nom;
     private final double altitude;
 
-    public Localisation(String id, double latitude, double longitude, String nom, double altitude) {
+    public Localisation(long id, double latitude, double longitude, String nom, double altitude) {
         this.id = id;
         this.latitude = latitude;
         this.longitude = longitude;
@@ -16,16 +15,29 @@ public class Localisation {
         this.altitude = altitude;
     }
 
-    // Getters obligatoires pour tes algorithmes
-    public String getId() { return id; }
-    public double getLatitude() { return latitude; }
-    public double getLongitude() { return longitude; }
-    public String getNom() { return nom; }
-    public double getAltitude() { return altitude; }
+    public long getId() {
+        return id;
+    }
+
+
+    public double getLatitude() {
+        return latitude;
+    }
+
+    public double getLongitude() {
+        return longitude;
+    }
+
+    public String getNom() {
+        return nom;
+    }
+
+    public double getAltitude() {
+        return altitude;
+    }
 
     @Override
     public String toString() {
-        return "Localisation{" + id + " - " + nom + " (alt: " + altitude + "m)}";
+        return id + " : altitude : " + altitude;
     }
-
 }

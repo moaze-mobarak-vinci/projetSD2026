@@ -1,12 +1,12 @@
 package be.vinci.resilience;
 
 public class Route {
-    private final String idOrigine;
-    private final String idDestination;
+    private final long idOrigine;
+    private final long idDestination;
     private final double distance;
     private final String nom;
 
-    public Route(String idOrigine, String idDestination, double distance, String nom) {
+    public Route(long idOrigine, long idDestination, double distance, String nom) {
         this.idOrigine = idOrigine;
         this.idDestination = idDestination;
         this.distance = distance;
@@ -14,8 +14,8 @@ public class Route {
     }
 
     // Getters
-    public String getIdOrigine() { return idOrigine; }
-    public String getIdDestination() { return idDestination; }
+    public long getIdOrigine() { return idOrigine; }
+    public long getIdDestination() { return idDestination; }
     public double getDistance() { return distance; }
     public String getNom() { return nom; }
 
