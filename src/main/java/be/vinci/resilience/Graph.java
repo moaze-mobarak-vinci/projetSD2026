@@ -64,4 +64,22 @@ public class Graph {
 
         return chemin;
     }
+
+    // Classe interne pour l'Algorithme 3 (Dijkstra pour la crue)
+    private static class EtatInondation implements Comparable<EtatInondation> {
+        final Localisation localisation;
+        final double temps;
+        final double vitesse;
+
+        EtatInondation(Localisation localisation, double temps, double vitesse) {
+            this.localisation = localisation;
+            this.temps = temps;
+            this.vitesse = vitesse;
+        }
+
+        @Override
+        public int compareTo(EtatInondation autre) {
+            return Double.compare(this.temps, autre.temps); // Priorité au temps le plus court
+        }
+    }
 }
