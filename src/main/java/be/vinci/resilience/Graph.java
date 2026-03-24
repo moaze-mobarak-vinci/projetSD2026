@@ -47,54 +47,56 @@ public class Graph {
      * ALGORITHME 3 : Chronologie de la crue
      */
     public Map<Localisation, Double> determinerChronologieDeLaCrue(long[] sources, double t0, double k) {
-        // Map finale ordonnée : associe une Localisation à son temps d'inondation
-        Map<Localisation, Double> tFlood = new LinkedHashMap<>();
+            // Map finale ordonnée : associe une Localisation à son temps d'inondation
+            Map<Localisation, Double> tFlood = new LinkedHashMap<>();
 
-        // File de priorité pour Dijkstra (ordonnée par le temps le plus court)
-        PriorityQueue<EtatInondation> queue = new PriorityQueue<>();
+            // File de priorité pour Dijkstra (ordonnée par le temps le plus court)
+            PriorityQueue<EtatInondation> queue = new PriorityQueue<>();
 
-        // 1. Initialisation : l'eau commence aux sources au temps 0 avec la vitesse initiale t0
-        for (long id : sources) {
-            Localisation loc = localisations.get(id);
-            if (loc != null) {
-                queue.add(new EtatInondation(loc, 0.0, t0));
-            }
-        }
-
-        // 2. Boucle principale de Dijkstra
-        while (!queue.isEmpty()) {
-            EtatInondation actuel = queue.poll();
-            Localisation locActuelle = actuel.localisation;
-
-            // Si ce nœud est déjà inondé, on l'ignore (on a déjà trouvé un chemin plus rapide pour lui)
-            if (tFlood.containsKey(locActuelle)) {
-                continue;
+            // 1. Initialisation : l'eau commence aux sources au temps 0 avec la vitesse initiale t0
+            for (long id : sources) {
+                Localisation loc = localisations.get(id);
+                if (loc != null) {
+                    queue.add(new EtatInondation(loc, 0.0, t0));
+                }
             }
 
-            // On enregistre le temps d'inondation pour ce nœud
-            tFlood.put(locActuelle, actuel.temps);
+            // 2. Boucle unique de propagation (Dijkstra)
+            while (!queue.isEmpty()) {
+                EtatInondation actuel = queue.poll();
+                Localisation locActuelle = actuel.localisation;
 
-            // TODO: Étape suivante : Propager l'eau vers les voisins (les routes adjacentes)
-        }
+                if (tFlood.containsKey(locActuelle)) {
+                    continue;
+                }
 
-        // 2. Boucle principale de Dijkstra
-        while (!queue.isEmpty()) {
-            EtatInondation actuel = queue.poll();
-            Localisation locActuelle = actuel.localisation;
+                tFlood.put(locActuelle, actuel.temps);
 
-            // Si ce nœud est déjà inondé, on l'ignore (on a déjà trouvé un chemin plus rapide pour lui)
-            if (tFlood.containsKey(locActuelle)) {
-                continue;
+                // 3. Propagation vers les voisins
+                List<Route> routes = adjacence.get(locActuelle.getId());
+                if (routes != null) {
+                    for (Route route : routes) {
+                        Localisation voisin = localisations.get(route.getIdDestination());
+
+                        if (voisin != null && !tFlood.containsKey(voisin)) {
+                            double pente = route.calculerPente(locActuelle.getAltitude(), voisin.getAltitude());
+                            double nouvelleVitesse = actuel.vitesse + (k * pente);
+
+                            if (nouvelleVitesse > 0) {
+                                double tempsParcours = route.getDistance() / nouvelleVitesse;
+                                double tempsArriveeVoisin = actuel.temps + tempsParcours;
+
+                                queue.add(new EtatInondation(voisin, tempsArriveeVoisin, nouvelleVitesse));
+                            }
+                        }
+                    }
+                }
             }
 
-            // On enregistre le temps d'inondation pour ce nœud
-            tFlood.put(locActuelle, actuel.temps);
-
-            // TODO: Étape suivante : Propager l'eau vers les voisins (les routes adjacentes) !
+            return tFlood;
         }
 
-        return tFlood;
-    }
+
 
     /**
      * ALGORITHME 4 : Évacuation dynamique
@@ -124,4 +126,5 @@ public class Graph {
             return Double.compare(this.temps, autre.temps); // Priorité au temps le plus court
         }
     }
+
 }
