@@ -127,4 +127,22 @@ public class Graph {
         }
     }
 
+    // Classe interne pour l'Algorithme 4 (Dijkstra pour la voiture)
+    private static class EtatVehicule implements Comparable<EtatVehicule> {
+        final Localisation localisation;
+        final double temps;
+        final EtatVehicule parent; // Pour pouvoir reconstruire le chemin à la fin
+
+        EtatVehicule(Localisation localisation, double temps, EtatVehicule parent) {
+            this.localisation = localisation;
+            this.temps = temps;
+            this.parent = parent;
+        }
+
+        @Override
+        public int compareTo(EtatVehicule autre) {
+            return Double.compare(this.temps, autre.temps); // Priorité au véhicule le plus rapide
+        }
+    }
+
 }
