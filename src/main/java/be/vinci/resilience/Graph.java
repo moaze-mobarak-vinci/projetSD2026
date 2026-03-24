@@ -47,9 +47,21 @@ public class Graph {
      * ALGORITHME 3 : Chronologie de la crue
      */
     public Map<Localisation, Double> determinerChronologieDeLaCrue(long[] sources, double t0, double k) {
-        Map<Localisation, Double> tFlood = new HashMap<>();
+        // Map finale ordonnée : associe une Localisation à son temps d'inondation
+        Map<Localisation, Double> tFlood = new LinkedHashMap<>();
 
-        // TODO: Implémenter la logique de propagation (V_water, pente, etc.)
+        // File de priorité pour Dijkstra (ordonnée par le temps le plus court)
+        PriorityQueue<EtatInondation> queue = new PriorityQueue<>();
+
+        // 1. Initialisation : l'eau commence aux sources au temps 0 avec la vitesse initiale t0
+        for (long id : sources) {
+            Localisation loc = localisations.get(id);
+            if (loc != null) {
+                queue.add(new EtatInondation(loc, 0.0, t0));
+            }
+        }
+
+        // TODO: Ajouter la boucle de propagation
 
         return tFlood;
     }
