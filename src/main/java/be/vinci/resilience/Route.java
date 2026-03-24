@@ -14,10 +14,21 @@ public class Route {
     }
 
     // Getters
-    public long getIdOrigine() { return idOrigine; }
-    public long getIdDestination() { return idDestination; }
-    public double getDistance() { return distance; }
-    public String getNom() { return nom; }
+    public long getIdOrigine() {
+        return idOrigine;
+    }
+
+    public long getIdDestination() {
+        return idDestination;
+    }
+
+    public double getDistance() {
+        return distance;
+    }
+
+    public String getNom() {
+        return nom;
+    }
 
     /**
      * Calcule la pente S entre deux points.
