@@ -61,7 +61,37 @@ public class Graph {
             }
         }
 
-        // TODO: Ajouter la boucle de propagation
+        // 2. Boucle principale de Dijkstra
+        while (!queue.isEmpty()) {
+            EtatInondation actuel = queue.poll();
+            Localisation locActuelle = actuel.localisation;
+
+            // Si ce nœud est déjà inondé, on l'ignore (on a déjà trouvé un chemin plus rapide pour lui)
+            if (tFlood.containsKey(locActuelle)) {
+                continue;
+            }
+
+            // On enregistre le temps d'inondation pour ce nœud
+            tFlood.put(locActuelle, actuel.temps);
+
+            // TODO: Étape suivante : Propager l'eau vers les voisins (les routes adjacentes)
+        }
+
+        // 2. Boucle principale de Dijkstra
+        while (!queue.isEmpty()) {
+            EtatInondation actuel = queue.poll();
+            Localisation locActuelle = actuel.localisation;
+
+            // Si ce nœud est déjà inondé, on l'ignore (on a déjà trouvé un chemin plus rapide pour lui)
+            if (tFlood.containsKey(locActuelle)) {
+                continue;
+            }
+
+            // On enregistre le temps d'inondation pour ce nœud
+            tFlood.put(locActuelle, actuel.temps);
+
+            // TODO: Étape suivante : Propager l'eau vers les voisins (les routes adjacentes) !
+        }
 
         return tFlood;
     }
