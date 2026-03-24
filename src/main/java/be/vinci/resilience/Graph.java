@@ -103,8 +103,19 @@ public class Graph {
      */
     public Deque<Localisation> trouverCheminDEvacuationLePlusCourt(long depart, long destination, double vitesse, Map<Localisation, Double> tFlood) {
         Deque<Localisation> chemin = new ArrayDeque<>();
+        PriorityQueue<EtatVehicule> queue = new PriorityQueue<>();
 
-        // TODO: Implémenter Dijkstra modifié avec la contrainte de temps
+        // Map pour mémoriser le meilleur temps d'arrivée à un nœud pour le véhicule
+        Map<Localisation, Double> meilleursTempsVehicule = new HashMap<>();
+
+        Localisation locDepart = localisations.get(depart);
+        if (locDepart == null) return chemin;
+
+        // On commence au point de départ au temps t = 0 (sans parent)
+        queue.add(new EtatVehicule(locDepart, 0.0, null));
+        meilleursTempsVehicule.put(locDepart, 0.0);
+
+        // TODO: Étape suivante : Boucle principale de déplacement du véhicule !
 
         return chemin;
     }
