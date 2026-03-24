@@ -115,7 +115,46 @@ public class Graph {
         queue.add(new EtatVehicule(locDepart, 0.0, null));
         meilleursTempsVehicule.put(locDepart, 0.0);
 
-        // TODO: Étape suivante : Boucle principale de déplacement du véhicule !
+        // 2. Boucle principale de Dijkstra pour le véhicule
+        EtatVehicule arriveeFinale = null;
+
+        while (!queue.isEmpty()) {
+            EtatVehicule actuel = queue.poll();
+            Localisation locActuelle = actuel.localisation;
+
+            // Si on a atteint la destination, on s'arrête (Dijkstra garantit que c'est le plus court !)
+            if (locActuelle.getId() == destination) {
+                arriveeFinale = actuel;
+                break;
+            }
+
+            // On explore les voisins
+            List<Route> routes = adjacence.get(locActuelle.getId());
+            if (routes != null) {
+                for (Route route : routes) {
+                    Localisation voisin = localisations.get(route.getIdDestination());
+
+                    if (voisin != null) {
+                        double tempsTrajet = route.getDistance() / vitesse;
+                        double tempsArriveeVoisin = actuel.temps + tempsTrajet;
+
+                        // Vérifier si le voisin est inondé au moment où le véhicule y arrive
+                        Double tempsInondationVoisin = tFlood.get(voisin);
+                        if (tempsInondationVoisin != null && tempsArriveeVoisin >= tempsInondationVoisin) {
+                            continue; // Route sous l'eau, on l'esquive !
+                        }
+
+                        // Si c'est un meilleur chemin pour arriver à ce voisin, on l'enregistre
+                        if (!meilleursTempsVehicule.containsKey(voisin) || tempsArriveeVoisin < meilleursTempsVehicule.get(voisin)) {
+                            meilleursTempsVehicule.put(voisin, tempsArriveeVoisin);
+                            queue.add(new EtatVehicule(voisin, tempsArriveeVoisin, actuel));
+                        }
+                    }
+                }
+            }
+        }
+
+        // TODO: Dernière étape : Reconstruire le chemin à l'envers
 
         return chemin;
     }
