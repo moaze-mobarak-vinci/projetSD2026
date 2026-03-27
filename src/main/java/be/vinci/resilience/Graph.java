@@ -25,33 +25,29 @@ public class Graph {
         }
     }
 
-    private static class WaterState {
+    private class EtatEau {
         long id;
-        double time;
-        double speed;
+        double temps;
+        double vitesse;
 
-        WaterState(long id, double time, double speed) {
+        EtatEau(long id, double temps, double vitesse) {
             this.id = id;
-            this.time = time;
-            this.speed = speed;
+            this.temps = temps;
+            this.vitesse = vitesse;
         }
     }
 
-    private static class TravelState {
+    private class EtatTrajet {
         long id;
-        double time;
+        double temps;
 
-        TravelState(long id, double time) {
+        EtatTrajet(long id, double temps) {
             this.id = id;
-            this.time = time;
+            this.temps = temps;
         }
     }
 
     public Localisation[] determinerZoneInondee(long[] idsDepart, double epsilon) {
-        if (idsDepart == null) {
-            throw new IllegalArgumentException("idsDepart null");
-        }
-
         List<Localisation> resultat = new ArrayList<>();
         Set<Long> visites = new HashSet<>();
         Queue<Localisation> file = new ArrayDeque<>();
@@ -66,14 +62,12 @@ public class Graph {
 
         while (!file.isEmpty()) {
             Localisation courant = file.remove();
-            List<Route> routes = adjacence.getOrDefault(courant.getId(), Collections.emptyList());
+            List<Route> routes = adjacence.getOrDefault(courant.getId(), new ArrayList<>());
 
             for (Route route : routes) {
                 Localisation voisin = localisations.get(route.getIdDestination());
 
-                if (voisin != null
-                        && !visites.contains(voisin.getId())
-                        && voisin.getAltitude() <= courant.getAltitude() + epsilon) {
+                if (voisin != null && !visites.contains(voisin.getId()) && voisin.getAltitude() <= courant.getAltitude() + epsilon) {
                     visites.add(voisin.getId());
                     file.add(voisin);
                     resultat.add(voisin);
@@ -112,32 +106,32 @@ public class Graph {
         }
 
         Map<Long, Double> distances = new HashMap<>();
-        Map<Long, Long> parent = new HashMap<>();
+        Map<Long, Long> parents = new HashMap<>();
 
-        class NodeDistance {
+        class NoeudDistance {
             long id;
             double distance;
 
-            NodeDistance(long id, double distance) {
+            NoeudDistance(long id, double distance) {
                 this.id = id;
                 this.distance = distance;
             }
         }
 
-        PriorityQueue<NodeDistance> pq = new PriorityQueue<>(Comparator.comparingDouble(n -> n.distance));
+        PriorityQueue<NoeudDistance> filePriorite = new PriorityQueue<>(Comparator.comparingDouble(n -> n.distance));
 
         for (Long id : localisations.keySet()) {
-            distances.put(id, Double.POSITIVE_INFINITY);
+            distances.put(id, Double.MAX_VALUE);
         }
 
         distances.put(depart, 0.0);
-        pq.add(new NodeDistance(depart, 0.0));
+        filePriorite.add(new NoeudDistance(depart, 0.0));
 
-        while (!pq.isEmpty()) {
-            NodeDistance courantEtat = pq.poll();
-            long courant = courantEtat.id;
+        while (!filePriorite.isEmpty()) {
+            NoeudDistance etatCourant = filePriorite.poll();
+            long courant = etatCourant.id;
 
-            if (courantEtat.distance > distances.get(courant)) {
+            if (etatCourant.distance > distances.get(courant)) {
                 continue;
             }
 
@@ -145,44 +139,39 @@ public class Graph {
                 break;
             }
 
-            List<Route> routes = adjacence.getOrDefault(courant, Collections.emptyList());
+            List<Route> routes = adjacence.getOrDefault(courant, new ArrayList<>());
 
             for (Route route : routes) {
                 long voisin = route.getIdDestination();
 
-                if (idsInondes.contains(voisin)) {
+                if (idsInondes.contains(voisin) || !localisations.containsKey(voisin)) {
                     continue;
                 }
 
-                if (!localisations.containsKey(voisin)) {
-                    continue;
-                }
+                double nouvelleDist = distances.get(courant) + route.getDistance();
 
-                double nouvelleDistance = distances.get(courant) + route.getDistance();
-
-                if (nouvelleDistance < distances.get(voisin)) {
-                    distances.put(voisin, nouvelleDistance);
-                    parent.put(voisin, courant);
-                    pq.add(new NodeDistance(voisin, nouvelleDistance));
+                if (nouvelleDist < distances.get(voisin)) {
+                    distances.put(voisin, nouvelleDist);
+                    parents.put(voisin, courant);
+                    filePriorite.add(new NoeudDistance(voisin, nouvelleDist));
                 }
             }
         }
 
-        if (distances.get(destination) == Double.POSITIVE_INFINITY) {
+        if (distances.get(destination) == Double.MAX_VALUE) {
             return chemin;
         }
 
         Long courant = destination;
         while (courant != null) {
             Localisation localisation = localisations.get(courant);
-            if (localisation == null) {
-                return new ArrayDeque<>();
+            if (localisation != null) {
+                chemin.addFirst(localisation);
             }
-            chemin.addFirst(localisation);
             if (courant == depart) {
                 break;
             }
-            courant = parent.get(courant);
+            courant = parents.get(courant);
         }
 
         if (chemin.isEmpty() || chemin.peekFirst().getId() != depart) {
@@ -193,171 +182,147 @@ public class Graph {
     }
 
     public Map<Localisation, Double> determinerChronologieDeLaCrue(long[] sources, double vWaterInit, double k) {
-        if (sources == null || sources.length == 0) {
-            return new LinkedHashMap<>();
-        }
+        Map<Localisation, Double> resultat = new LinkedHashMap<>();
+        if (sources == null || sources.length == 0) return resultat;
 
-        Map<Long, Double> bestTime = new HashMap<>();
-        PriorityQueue<WaterState> pq = new PriorityQueue<>(Comparator.comparingDouble(s -> s.time));
+        Map<Long, Double> meilleursTemps = new HashMap<>();
+        PriorityQueue<EtatEau> filePriorite = new PriorityQueue<>(Comparator.comparingDouble(e -> e.temps));
 
-        for (long sourceId : sources) {
-            if (!localisations.containsKey(sourceId)) {
-                continue;
-            }
-            double previous = bestTime.getOrDefault(sourceId, Double.POSITIVE_INFINITY);
-            if (0.0 < previous) {
-                bestTime.put(sourceId, 0.0);
-                pq.add(new WaterState(sourceId, 0.0, vWaterInit));
+        for (long idSource : sources) {
+            if (localisations.containsKey(idSource)) {
+                meilleursTemps.put(idSource, 0.0);
+                filePriorite.add(new EtatEau(idSource, 0.0, vWaterInit));
             }
         }
 
-        while (!pq.isEmpty()) {
-            WaterState state = pq.poll();
-            double known = bestTime.getOrDefault(state.id, Double.POSITIVE_INFINITY);
-            if (state.time > known + 1e-12) {
+        while (!filePriorite.isEmpty()) {
+            EtatEau etat = filePriorite.poll();
+            double tempsConnu = meilleursTemps.getOrDefault(etat.id, Double.MAX_VALUE);
+
+            if (etat.temps > tempsConnu) {
                 continue;
             }
 
-            Localisation courant = localisations.get(state.id);
-            if (courant == null) {
-                continue;
-            }
+            Localisation courant = localisations.get(etat.id);
+            if (courant == null) continue;
 
-            List<Route> routes = adjacence.getOrDefault(state.id, Collections.emptyList());
+            List<Route> routes = adjacence.getOrDefault(etat.id, new ArrayList<>());
             for (Route route : routes) {
                 Localisation voisin = localisations.get(route.getIdDestination());
-                if (voisin == null) {
-                    continue;
-                }
-                if (route.getDistance() <= 0) {
-                    continue;
-                }
+                if (voisin == null || route.getDistance() <= 0) continue;
 
-                double slope = (courant.getAltitude() - voisin.getAltitude()) / route.getDistance();
-                double nextSpeed = state.speed + (k * slope);
-                if (nextSpeed <= 0) {
-                    continue;
-                }
+                double pente = (courant.getAltitude() - voisin.getAltitude()) / route.getDistance();
+                double vitesseSuivante = etat.vitesse + (k * pente);
 
-                double edgeTime = route.getDistance() / nextSpeed;
-                double newTime = state.time + edgeTime;
-                long voisinId = voisin.getId();
-                double oldTime = bestTime.getOrDefault(voisinId, Double.POSITIVE_INFINITY);
+                if (vitesseSuivante <= 0) continue;
 
-                if (newTime + 1e-12 < oldTime) {
-                    bestTime.put(voisinId, newTime);
-                    pq.add(new WaterState(voisinId, newTime, nextSpeed));
+                double tempsTrajet = route.getDistance() / vitesseSuivante;
+                double nouveauTemps = etat.temps + tempsTrajet;
+                long idVoisin = voisin.getId();
+                double ancienTemps = meilleursTemps.getOrDefault(idVoisin, Double.MAX_VALUE);
+
+                if (nouveauTemps < ancienTemps) {
+                    meilleursTemps.put(idVoisin, nouveauTemps);
+                    filePriorite.add(new EtatEau(idVoisin, nouveauTemps, vitesseSuivante));
                 }
             }
         }
 
-        List<Map.Entry<Long, Double>> entries = new ArrayList<>(bestTime.entrySet());
-        entries.sort((a, b) -> {
-            int byTime = Double.compare(a.getValue(), b.getValue());
-            if (byTime != 0) {
-                return byTime;
-            }
+        List<Map.Entry<Long, Double>> entrees = new ArrayList<>(meilleursTemps.entrySet());
+        entrees.sort((a, b) -> {
+            int comparaisonTemps = Double.compare(a.getValue(), b.getValue());
+            if (comparaisonTemps != 0) return comparaisonTemps;
             return Long.compare(a.getKey(), b.getKey());
         });
 
-        Map<Localisation, Double> ordered = new LinkedHashMap<>();
-        for (Map.Entry<Long, Double> entry : entries) {
-            Localisation loc = localisations.get(entry.getKey());
+        for (Map.Entry<Long, Double> entree : entrees) {
+            Localisation loc = localisations.get(entree.getKey());
             if (loc != null) {
-                ordered.put(loc, entry.getValue());
+                resultat.put(loc, entree.getValue());
             }
         }
 
-        return ordered;
+        return resultat;
     }
 
     public Deque<Localisation> trouverCheminDEvacuationLePlusCourt(long depart, long destination, double vVehicule, Map<Localisation, Double> tFlood) {
         Deque<Localisation> chemin = new ArrayDeque<>();
-        if (vVehicule <= 0) {
-            return chemin;
-        }
+        if (vVehicule <= 0) return chemin;
 
         Localisation locDepart = localisations.get(depart);
         Localisation locDestination = localisations.get(destination);
-        if (locDepart == null || locDestination == null) {
-            return chemin;
-        }
+        if (locDepart == null || locDestination == null) return chemin;
 
-        Map<Long, Double> tFloodById = new HashMap<>();
+        Map<Long, Double> tempsCrueParId = new HashMap<>();
         if (tFlood != null) {
-            for (Map.Entry<Localisation, Double> entry : tFlood.entrySet()) {
-                Localisation loc = entry.getKey();
-                Double time = entry.getValue();
-                if (loc != null && time != null) {
-                    tFloodById.put(loc.getId(), time);
+            for (Map.Entry<Localisation, Double> entree : tFlood.entrySet()) {
+                if (entree.getKey() != null && entree.getValue() != null) {
+                    tempsCrueParId.put(entree.getKey().getId(), entree.getValue());
                 }
             }
         }
 
-        Double tDepartFlood = tFloodById.get(depart);
-        if (tDepartFlood != null && 0.0 >= tDepartFlood) {
+        Double tempsCrueDepart = tempsCrueParId.get(depart);
+        if (tempsCrueDepart != null && tempsCrueDepart <= 0.0) {
             return chemin;
         }
 
-        Map<Long, Double> bestTime = new HashMap<>();
-        Map<Long, Long> parent = new HashMap<>();
-        PriorityQueue<TravelState> pq = new PriorityQueue<>(Comparator.comparingDouble(s -> s.time));
+        Map<Long, Double> meilleursTemps = new HashMap<>();
+        Map<Long, Long> parents = new HashMap<>();
+        PriorityQueue<EtatTrajet> filePriorite = new PriorityQueue<>(Comparator.comparingDouble(e -> e.temps));
 
-        bestTime.put(depart, 0.0);
-        pq.add(new TravelState(depart, 0.0));
+        meilleursTemps.put(depart, 0.0);
+        filePriorite.add(new EtatTrajet(depart, 0.0));
 
-        while (!pq.isEmpty()) {
-            TravelState state = pq.poll();
-            double known = bestTime.getOrDefault(state.id, Double.POSITIVE_INFINITY);
-            if (state.time > known + 1e-12) {
+        while (!filePriorite.isEmpty()) {
+            EtatTrajet etat = filePriorite.poll();
+            double tempsConnu = meilleursTemps.getOrDefault(etat.id, Double.MAX_VALUE);
+
+            if (etat.temps > tempsConnu) {
                 continue;
             }
 
-            if (state.id == destination) {
+            if (etat.id == destination) {
                 break;
             }
 
-            List<Route> routes = adjacence.getOrDefault(state.id, Collections.emptyList());
+            List<Route> routes = adjacence.getOrDefault(etat.id, new ArrayList<>());
             for (Route route : routes) {
-                if (route.getDistance() <= 0) {
+                if (route.getDistance() <= 0) continue;
+
+                long idVoisin = route.getIdDestination();
+                if (!localisations.containsKey(idVoisin)) continue;
+
+                double tempsArrivee = etat.temps + (route.getDistance() / vVehicule);
+                Double tempsCrue = tempsCrueParId.get(idVoisin);
+
+                if (tempsCrue != null && tempsArrivee >= tempsCrue) {
                     continue;
                 }
 
-                long voisinId = route.getIdDestination();
-                if (!localisations.containsKey(voisinId)) {
-                    continue;
-                }
-
-                double arrivalTime = state.time + (route.getDistance() / vVehicule);
-                Double floodTime = tFloodById.get(voisinId);
-                if (floodTime != null && arrivalTime >= floodTime) {
-                    continue;
-                }
-
-                double old = bestTime.getOrDefault(voisinId, Double.POSITIVE_INFINITY);
-                if (arrivalTime + 1e-12 < old) {
-                    bestTime.put(voisinId, arrivalTime);
-                    parent.put(voisinId, state.id);
-                    pq.add(new TravelState(voisinId, arrivalTime));
+                double ancienTemps = meilleursTemps.getOrDefault(idVoisin, Double.MAX_VALUE);
+                if (tempsArrivee < ancienTemps) {
+                    meilleursTemps.put(idVoisin, tempsArrivee);
+                    parents.put(idVoisin, etat.id);
+                    filePriorite.add(new EtatTrajet(idVoisin, tempsArrivee));
                 }
             }
         }
 
-        if (!bestTime.containsKey(destination)) {
+        if (!meilleursTemps.containsKey(destination)) {
             return chemin;
         }
 
         Long courant = destination;
         while (courant != null) {
             Localisation loc = localisations.get(courant);
-            if (loc == null) {
-                return new ArrayDeque<>();
+            if (loc != null) {
+                chemin.addFirst(loc);
             }
-            chemin.addFirst(loc);
             if (courant == depart) {
                 break;
             }
-            courant = parent.get(courant);
+            courant = parents.get(courant);
         }
 
         if (chemin.isEmpty() || chemin.peekFirst().getId() != depart) {
