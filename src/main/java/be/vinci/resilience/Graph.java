@@ -3,17 +3,10 @@ package be.vinci.resilience;
 import java.util.*;
 
 public class Graph {
-    // Utilisation de Long pour les IDs pour correspondre au test
-    private Map<Long, Localisation> localisations = new HashMap<>();
-    private Map<Long, List<Route>> adjacence = new HashMap<>();
+    private final Map<Long, Localisation> localisations = new HashMap<>();
+    private final Map<Long, List<Route>> adjacence = new HashMap<>();
 
-    /**
-     * Constructeur utilisé par TestSimulator10
-     * @param fichierNoeuds nom du fichier (ex: "nodes_10.csv")
-     * @param fichierArcs nom du fichier (ex: "edges_10.csv")
-     */
     public Graph(String fichierNoeuds, String fichierArcs) {
-        // On appelle le loader. On suppose que les fichiers sont dans le dossier "data"
         GraphLoader.chargerGraphe(this, "data/" + fichierNoeuds, "data/" + fichierArcs);
     }
 
@@ -23,13 +16,14 @@ public class Graph {
     }
 
     public void addRoute(Route route) {
-        if (adjacence.containsKey(route.getIdOrigine())) {
-            adjacence.get(route.getIdOrigine()).add(route);
+        adjacence.putIfAbsent(route.getIdOrigine(), new ArrayList<>());
+        adjacence.get(route.getIdOrigine()).add(route);
+
+        Localisation origine = localisations.get(route.getIdOrigine());
+        if (origine != null) {
+            origine.ajouterRouteSortante(route);
         }
     }
-
-    // --- MÉTHODES REQUISES PAR LE TEST (LOT A & B) ---
-    // On les laisse vides (return par défaut) pour que le test compile.
 
     private static class WaterState {
         long id;
@@ -53,51 +47,41 @@ public class Graph {
         }
     }
 
-    public Localisation[] determinerZoneInondee(long[] ids, double epsilon) {
-        if (ids == null || ids.length == 0) {
-            return new Localisation[0];
+    public Localisation[] determinerZoneInondee(long[] idsDepart, double epsilon) {
+        if (idsDepart == null) {
+            throw new IllegalArgumentException("idsDepart null");
         }
 
-        Deque<Long> file = new ArrayDeque<>();
+        List<Localisation> resultat = new ArrayList<>();
         Set<Long> visites = new HashSet<>();
-        List<Localisation> ordreInondation = new ArrayList<>();
+        Queue<Localisation> file = new ArrayDeque<>();
 
-        for (long id : ids) {
-            Localisation source = localisations.get(id);
-            if (source != null && visites.add(id)) {
-                file.add(id);
-                ordreInondation.add(source);
+        for (long id : idsDepart) {
+            Localisation depart = localisations.get(id);
+            if (depart != null && visites.add(id)) {
+                file.add(depart);
+                resultat.add(depart);
             }
         }
 
         while (!file.isEmpty()) {
-            long courantId = file.poll();
-            Localisation courant = localisations.get(courantId);
-            if (courant == null) {
-                continue;
-            }
+            Localisation courant = file.remove();
+            List<Route> routes = adjacence.getOrDefault(courant.getId(), Collections.emptyList());
 
-            List<Route> routes = adjacence.getOrDefault(courantId, Collections.emptyList());
             for (Route route : routes) {
-                long voisinId = route.getIdDestination();
-                if (visites.contains(voisinId)) {
-                    continue;
-                }
+                Localisation voisin = localisations.get(route.getIdDestination());
 
-                Localisation voisin = localisations.get(voisinId);
-                if (voisin == null) {
-                    continue;
-                }
-
-                if (voisin.getAltitude() <= courant.getAltitude() + epsilon) {
-                    visites.add(voisinId);
-                    file.add(voisinId);
-                    ordreInondation.add(voisin);
+                if (voisin != null
+                        && !visites.contains(voisin.getId())
+                        && voisin.getAltitude() <= courant.getAltitude() + epsilon) {
+                    visites.add(voisin.getId());
+                    file.add(voisin);
+                    resultat.add(voisin);
                 }
             }
         }
 
-        return ordreInondation.toArray(new Localisation[0]);
+        return resultat.toArray(new Localisation[0]);
     }
 
     public Deque<Localisation> trouverCheminLePlusCourtPourContournerLaZoneInondee(long depart, long destination, Localisation[] zone) {
@@ -358,24 +342,5 @@ public class Graph {
         }
 
         return chemin;
-    
-    }
-
-    // Classe interne pour l'Algorithme 3 (Dijkstra pour la crue)
-    private static class EtatInondation implements Comparable<EtatInondation> {
-        final Localisation localisation;
-        final double temps;
-        final double vitesse;
-
-        EtatInondation(Localisation localisation, double temps, double vitesse) {
-            this.localisation = localisation;
-            this.temps = temps;
-            this.vitesse = vitesse;
-        }
-        @Override
-        public int compareTo(EtatInondation autre) {
-            return Double.compare(this.temps, autre.temps); // Priorité au temps le plus court
-        }
     }
 }
-
