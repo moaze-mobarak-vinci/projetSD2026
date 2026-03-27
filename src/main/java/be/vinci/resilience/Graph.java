@@ -176,7 +176,6 @@ public class Graph {
             this.temps = temps;
             this.vitesse = vitesse;
         }
-
         @Override
         public int compareTo(EtatInondation autre) {
             return Double.compare(this.temps, autre.temps); // Priorité au temps le plus court
