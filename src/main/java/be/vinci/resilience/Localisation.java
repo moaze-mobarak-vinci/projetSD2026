@@ -69,4 +69,17 @@ public class Localisation {
     public String toString() {
         return "Localisation{id=" + id + ", nom='" + nom + "', altitude=" + altitude + "}";
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Localisation)) return false;
+        Localisation that = (Localisation) o;
+        return id == that.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return Long.hashCode(id);
+    }
 }
