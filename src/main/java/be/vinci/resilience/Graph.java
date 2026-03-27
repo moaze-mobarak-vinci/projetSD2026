@@ -154,9 +154,15 @@ public class Graph {
             }
         }
 
-        // TODO: Dernière étape : Reconstruire le chemin à l'envers
+        // 3. Reconstruction du chemin du point d'arrivée au point de départ
+        EtatVehicule curseur = arriveeFinale;
+        while (curseur != null) {
+            chemin.addFirst(curseur.localisation); // On ajoute au début pour l'avoir dans le bon ordre (départ -> arrivée)
+            curseur = curseur.parent;
+        }
 
         return chemin;
+    
     }
 
     // Classe interne pour l'Algorithme 3 (Dijkstra pour la crue)
