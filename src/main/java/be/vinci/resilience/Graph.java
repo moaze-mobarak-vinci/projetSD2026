@@ -111,21 +111,46 @@ public class Graph {
             return chemin;
         }
 
-        Queue<Long> file = new ArrayDeque<>();
-        Set<Long> visites = new HashSet<>();
+        Map<Long, Double> distances = new HashMap<>();
         Map<Long, Long> parent = new HashMap<>();
 
-        file.add(depart);
-        visites.add(depart);
+        class NodeDistance {
+            long id;
+            double distance;
 
-        boolean destinationAtteinte = false;
-        while (!file.isEmpty() && !destinationAtteinte) {
-            long courant = file.poll();
+            NodeDistance(long id, double distance) {
+                this.id = id;
+                this.distance = distance;
+            }
+        }
+
+        PriorityQueue<NodeDistance> pq = new PriorityQueue<>(Comparator.comparingDouble(n -> n.distance));
+
+        for (Long id : localisations.keySet()) {
+            distances.put(id, Double.POSITIVE_INFINITY);
+        }
+
+        distances.put(depart, 0.0);
+        pq.add(new NodeDistance(depart, 0.0));
+
+        while (!pq.isEmpty()) {
+            NodeDistance courantEtat = pq.poll();
+            long courant = courantEtat.id;
+
+            if (courantEtat.distance > distances.get(courant)) {
+                continue;
+            }
+
+            if (courant == destination) {
+                break;
+            }
+
             List<Route> routes = adjacence.getOrDefault(courant, Collections.emptyList());
 
             for (Route route : routes) {
                 long voisin = route.getIdDestination();
-                if (visites.contains(voisin) || idsInondes.contains(voisin)) {
+
+                if (idsInondes.contains(voisin)) {
                     continue;
                 }
 
@@ -133,19 +158,17 @@ public class Graph {
                     continue;
                 }
 
-                visites.add(voisin);
-                parent.put(voisin, courant);
+                double nouvelleDistance = distances.get(courant) + route.getDistance();
 
-                if (voisin == destination) {
-                    destinationAtteinte = true;
-                    break;
+                if (nouvelleDistance < distances.get(voisin)) {
+                    distances.put(voisin, nouvelleDistance);
+                    parent.put(voisin, courant);
+                    pq.add(new NodeDistance(voisin, nouvelleDistance));
                 }
-
-                file.add(voisin);
             }
         }
 
-        if (!destinationAtteinte) {
+        if (distances.get(destination) == Double.POSITIVE_INFINITY) {
             return chemin;
         }
 
