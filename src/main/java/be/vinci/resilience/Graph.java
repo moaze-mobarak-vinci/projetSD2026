@@ -23,17 +23,58 @@ public class Graph {
     }
 
     public void addRoute(Route route) {
-        if (adjacence.containsKey(route.getIdOrigine())) {
-            adjacence.get(route.getIdOrigine()).add(route);
+        adjacence.putIfAbsent(route.getIdOrigine(), new ArrayList<>());
+        adjacence.get(route.getIdOrigine()).add(route);
+
+        Localisation origine = localisations.get(route.getIdOrigine());
+        if (origine != null) {
+            origine.ajouterRouteSortante(route);
         }
-    }
+    } 
 
     // --- MÉTHODES REQUISES PAR LE TEST (LOT A & B) ---
     // On les laisse vides (return par défaut) pour que le test compile.
 
-    public Localisation[] determinerZoneInondee(long[] ids, double epsilon) {
-        // TODO: À compléter si tu dois faire le Lot A
-        return new Localisation[0];
+    public Localisation[] determinerZoneInondee(long[] idsDepart, double epsilon) {
+        if (idsDepart == null) {
+            throw new IllegalArgumentException("idsDepart null");
+        }
+
+        List<Localisation> resultat = new ArrayList<>();
+        Set<Long> visites = new HashSet<>();
+        Queue<Localisation> file = new ArrayDeque<>();
+
+        for (long id : idsDepart) {
+            Localisation depart = localisations.get(id);
+            if (depart != null && visites.add(id)) {
+                file.add(depart);
+                resultat.add(depart);
+            }
+        }
+
+        while (!file.isEmpty()) {
+            Localisation courant = file.remove();
+
+            List<Route> routes = adjacence.get(courant.getId());
+            if (routes == null) {
+                continue;
+            }
+
+            for (Route route : routes) {
+                Localisation voisin = localisations.get(route.getIdDestination());
+
+                if (voisin != null
+                    && !visites.contains(voisin.getId())
+                    && voisin.getAltitude() <= courant.getAltitude() + epsilon) {
+
+                    visites.add(voisin.getId());
+                    file.add(voisin);
+                    resultat.add(voisin);
+                }
+            }
+        }
+
+        return resultat.toArray(new Localisation[0]);
     }
 
     public Deque<Localisation> trouverCheminLePlusCourtPourContournerLaZoneInondee(long depart, long destination, Localisation[] zone) {
