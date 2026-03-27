@@ -31,134 +31,330 @@ public class Graph {
     // --- MÉTHODES REQUISES PAR LE TEST (LOT A & B) ---
     // On les laisse vides (return par défaut) pour que le test compile.
 
+    private static class WaterState {
+        long id;
+        double time;
+        double speed;
+
+        WaterState(long id, double time, double speed) {
+            this.id = id;
+            this.time = time;
+            this.speed = speed;
+        }
+    }
+
+    private static class TravelState {
+        long id;
+        double time;
+
+        TravelState(long id, double time) {
+            this.id = id;
+            this.time = time;
+        }
+    }
+
     public Localisation[] determinerZoneInondee(long[] ids, double epsilon) {
-        // TODO: À compléter si tu dois faire le Lot A
-        return new Localisation[0];
-    }
+        if (ids == null || ids.length == 0) {
+            return new Localisation[0];
+        }
 
-    public Deque<Localisation> trouverCheminLePlusCourtPourContournerLaZoneInondee(long depart, long destination, Localisation[] zone) {
-        // TODO: À compléter si tu dois faire le Lot B
-        return new ArrayDeque<>();
-    }
+        Deque<Long> file = new ArrayDeque<>();
+        Set<Long> visites = new HashSet<>();
+        List<Localisation> ordreInondation = new ArrayList<>();
 
-    // --- TES MÉTHODES (LOT C - ANALYSE TEMPORELLE) ---
+        for (long id : ids) {
+            Localisation source = localisations.get(id);
+            if (source != null && visites.add(id)) {
+                file.add(id);
+                ordreInondation.add(source);
+            }
+        }
 
-    /**
-     * ALGORITHME 3 : Chronologie de la crue
-     */
-    public Map<Localisation, Double> determinerChronologieDeLaCrue(long[] sources, double t0, double k) {
-            // Map finale ordonnée : associe une Localisation à son temps d'inondation
-            Map<Localisation, Double> tFlood = new LinkedHashMap<>();
-
-            // File de priorité pour Dijkstra (ordonnée par le temps le plus court)
-            PriorityQueue<EtatInondation> queue = new PriorityQueue<>();
-
-            // 1. Initialisation : l'eau commence aux sources au temps 0 avec la vitesse initiale t0
-            for (long id : sources) {
-                Localisation loc = localisations.get(id);
-                if (loc != null) {
-                    queue.add(new EtatInondation(loc, 0.0, t0));
-                }
+        while (!file.isEmpty()) {
+            long courantId = file.poll();
+            Localisation courant = localisations.get(courantId);
+            if (courant == null) {
+                continue;
             }
 
-            // 2. Boucle unique de propagation (Dijkstra)
-            while (!queue.isEmpty()) {
-                EtatInondation actuel = queue.poll();
-                Localisation locActuelle = actuel.localisation;
-
-                if (tFlood.containsKey(locActuelle)) {
+            List<Route> routes = adjacence.getOrDefault(courantId, Collections.emptyList());
+            for (Route route : routes) {
+                long voisinId = route.getIdDestination();
+                if (visites.contains(voisinId)) {
                     continue;
                 }
 
-                tFlood.put(locActuelle, actuel.temps);
+                Localisation voisin = localisations.get(voisinId);
+                if (voisin == null) {
+                    continue;
+                }
 
-                // 3. Propagation vers les voisins
-                List<Route> routes = adjacence.get(locActuelle.getId());
-                if (routes != null) {
-                    for (Route route : routes) {
-                        Localisation voisin = localisations.get(route.getIdDestination());
-
-                        if (voisin != null && !tFlood.containsKey(voisin)) {
-                            double pente = route.calculerPente(locActuelle.getAltitude(), voisin.getAltitude());
-                            double nouvelleVitesse = actuel.vitesse + (k * pente);
-
-                            if (nouvelleVitesse > 0) {
-                                double tempsParcours = route.getDistance() / nouvelleVitesse;
-                                double tempsArriveeVoisin = actuel.temps + tempsParcours;
-
-                                queue.add(new EtatInondation(voisin, tempsArriveeVoisin, nouvelleVitesse));
-                            }
-                        }
-                    }
+                if (voisin.getAltitude() <= courant.getAltitude() + epsilon) {
+                    visites.add(voisinId);
+                    file.add(voisinId);
+                    ordreInondation.add(voisin);
                 }
             }
-
-            return tFlood;
         }
 
+        return ordreInondation.toArray(new Localisation[0]);
+    }
 
-
-    /**
-     * ALGORITHME 4 : Évacuation dynamique
-     */
-    public Deque<Localisation> trouverCheminDEvacuationLePlusCourt(long depart, long destination, double vitesse, Map<Localisation, Double> tFlood) {
+    public Deque<Localisation> trouverCheminLePlusCourtPourContournerLaZoneInondee(long depart, long destination, Localisation[] zone) {
         Deque<Localisation> chemin = new ArrayDeque<>();
-        PriorityQueue<EtatVehicule> queue = new PriorityQueue<>();
-
-        // Map pour mémoriser le meilleur temps d'arrivée à un nœud pour le véhicule
-        Map<Localisation, Double> meilleursTempsVehicule = new HashMap<>();
 
         Localisation locDepart = localisations.get(depart);
-        if (locDepart == null) return chemin;
+        Localisation locDestination = localisations.get(destination);
+        if (locDepart == null || locDestination == null) {
+            return chemin;
+        }
 
-        // On commence au point de départ au temps t = 0 (sans parent)
-        queue.add(new EtatVehicule(locDepart, 0.0, null));
-        meilleursTempsVehicule.put(locDepart, 0.0);
+        Set<Long> idsInondes = new HashSet<>();
+        if (zone != null) {
+            for (Localisation loc : zone) {
+                if (loc != null) {
+                    idsInondes.add(loc.getId());
+                }
+            }
+        }
 
-        // 2. Boucle principale de Dijkstra pour le véhicule
-        EtatVehicule arriveeFinale = null;
+        if (idsInondes.contains(depart) || idsInondes.contains(destination)) {
+            return chemin;
+        }
 
-        while (!queue.isEmpty()) {
-            EtatVehicule actuel = queue.poll();
-            Localisation locActuelle = actuel.localisation;
+        if (depart == destination) {
+            chemin.add(locDepart);
+            return chemin;
+        }
 
-            // Si on a atteint la destination, on s'arrête (Dijkstra garantit que c'est le plus court !)
-            if (locActuelle.getId() == destination) {
-                arriveeFinale = actuel;
+        Queue<Long> file = new ArrayDeque<>();
+        Set<Long> visites = new HashSet<>();
+        Map<Long, Long> parent = new HashMap<>();
+
+        file.add(depart);
+        visites.add(depart);
+
+        boolean destinationAtteinte = false;
+        while (!file.isEmpty() && !destinationAtteinte) {
+            long courant = file.poll();
+            List<Route> routes = adjacence.getOrDefault(courant, Collections.emptyList());
+
+            for (Route route : routes) {
+                long voisin = route.getIdDestination();
+                if (visites.contains(voisin) || idsInondes.contains(voisin)) {
+                    continue;
+                }
+
+                if (!localisations.containsKey(voisin)) {
+                    continue;
+                }
+
+                visites.add(voisin);
+                parent.put(voisin, courant);
+
+                if (voisin == destination) {
+                    destinationAtteinte = true;
+                    break;
+                }
+
+                file.add(voisin);
+            }
+        }
+
+        if (!destinationAtteinte) {
+            return chemin;
+        }
+
+        Long courant = destination;
+        while (courant != null) {
+            Localisation localisation = localisations.get(courant);
+            if (localisation == null) {
+                return new ArrayDeque<>();
+            }
+            chemin.addFirst(localisation);
+            if (courant == depart) {
+                break;
+            }
+            courant = parent.get(courant);
+        }
+
+        if (chemin.isEmpty() || chemin.peekFirst().getId() != depart) {
+            return new ArrayDeque<>();
+        }
+
+        return chemin;
+    }
+
+    public Map<Localisation, Double> determinerChronologieDeLaCrue(long[] sources, double vWaterInit, double k) {
+        if (sources == null || sources.length == 0) {
+            return new LinkedHashMap<>();
+        }
+
+        Map<Long, Double> bestTime = new HashMap<>();
+        PriorityQueue<WaterState> pq = new PriorityQueue<>(Comparator.comparingDouble(s -> s.time));
+
+        for (long sourceId : sources) {
+            if (!localisations.containsKey(sourceId)) {
+                continue;
+            }
+            double previous = bestTime.getOrDefault(sourceId, Double.POSITIVE_INFINITY);
+            if (0.0 < previous) {
+                bestTime.put(sourceId, 0.0);
+                pq.add(new WaterState(sourceId, 0.0, vWaterInit));
+            }
+        }
+
+        while (!pq.isEmpty()) {
+            WaterState state = pq.poll();
+            double known = bestTime.getOrDefault(state.id, Double.POSITIVE_INFINITY);
+            if (state.time > known + 1e-12) {
+                continue;
+            }
+
+            Localisation courant = localisations.get(state.id);
+            if (courant == null) {
+                continue;
+            }
+
+            List<Route> routes = adjacence.getOrDefault(state.id, Collections.emptyList());
+            for (Route route : routes) {
+                Localisation voisin = localisations.get(route.getIdDestination());
+                if (voisin == null) {
+                    continue;
+                }
+                if (route.getDistance() <= 0) {
+                    continue;
+                }
+
+                double slope = (courant.getAltitude() - voisin.getAltitude()) / route.getDistance();
+                double nextSpeed = state.speed + (k * slope);
+                if (nextSpeed <= 0) {
+                    continue;
+                }
+
+                double edgeTime = route.getDistance() / nextSpeed;
+                double newTime = state.time + edgeTime;
+                long voisinId = voisin.getId();
+                double oldTime = bestTime.getOrDefault(voisinId, Double.POSITIVE_INFINITY);
+
+                if (newTime + 1e-12 < oldTime) {
+                    bestTime.put(voisinId, newTime);
+                    pq.add(new WaterState(voisinId, newTime, nextSpeed));
+                }
+            }
+        }
+
+        List<Map.Entry<Long, Double>> entries = new ArrayList<>(bestTime.entrySet());
+        entries.sort((a, b) -> {
+            int byTime = Double.compare(a.getValue(), b.getValue());
+            if (byTime != 0) {
+                return byTime;
+            }
+            return Long.compare(a.getKey(), b.getKey());
+        });
+
+        Map<Localisation, Double> ordered = new LinkedHashMap<>();
+        for (Map.Entry<Long, Double> entry : entries) {
+            Localisation loc = localisations.get(entry.getKey());
+            if (loc != null) {
+                ordered.put(loc, entry.getValue());
+            }
+        }
+
+        return ordered;
+    }
+
+    public Deque<Localisation> trouverCheminDEvacuationLePlusCourt(long depart, long destination, double vVehicule, Map<Localisation, Double> tFlood) {
+        Deque<Localisation> chemin = new ArrayDeque<>();
+        if (vVehicule <= 0) {
+            return chemin;
+        }
+
+        Localisation locDepart = localisations.get(depart);
+        Localisation locDestination = localisations.get(destination);
+        if (locDepart == null || locDestination == null) {
+            return chemin;
+        }
+
+        Map<Long, Double> tFloodById = new HashMap<>();
+        if (tFlood != null) {
+            for (Map.Entry<Localisation, Double> entry : tFlood.entrySet()) {
+                Localisation loc = entry.getKey();
+                Double time = entry.getValue();
+                if (loc != null && time != null) {
+                    tFloodById.put(loc.getId(), time);
+                }
+            }
+        }
+
+        Double tDepartFlood = tFloodById.get(depart);
+        if (tDepartFlood != null && 0.0 >= tDepartFlood) {
+            return chemin;
+        }
+
+        Map<Long, Double> bestTime = new HashMap<>();
+        Map<Long, Long> parent = new HashMap<>();
+        PriorityQueue<TravelState> pq = new PriorityQueue<>(Comparator.comparingDouble(s -> s.time));
+
+        bestTime.put(depart, 0.0);
+        pq.add(new TravelState(depart, 0.0));
+
+        while (!pq.isEmpty()) {
+            TravelState state = pq.poll();
+            double known = bestTime.getOrDefault(state.id, Double.POSITIVE_INFINITY);
+            if (state.time > known + 1e-12) {
+                continue;
+            }
+
+            if (state.id == destination) {
                 break;
             }
 
-            // On explore les voisins
-            List<Route> routes = adjacence.get(locActuelle.getId());
-            if (routes != null) {
-                for (Route route : routes) {
-                    Localisation voisin = localisations.get(route.getIdDestination());
+            List<Route> routes = adjacence.getOrDefault(state.id, Collections.emptyList());
+            for (Route route : routes) {
+                if (route.getDistance() <= 0) {
+                    continue;
+                }
 
-                    if (voisin != null) {
-                        double tempsTrajet = route.getDistance() / vitesse;
-                        double tempsArriveeVoisin = actuel.temps + tempsTrajet;
+                long voisinId = route.getIdDestination();
+                if (!localisations.containsKey(voisinId)) {
+                    continue;
+                }
 
-                        // Vérifier si le voisin est inondé au moment où le véhicule y arrive
-                        Double tempsInondationVoisin = tFlood.get(voisin);
-                        if (tempsInondationVoisin != null && tempsArriveeVoisin >= tempsInondationVoisin) {
-                            continue; // Route sous l'eau, on l'esquive !
-                        }
+                double arrivalTime = state.time + (route.getDistance() / vVehicule);
+                Double floodTime = tFloodById.get(voisinId);
+                if (floodTime != null && arrivalTime >= floodTime) {
+                    continue;
+                }
 
-                        // Si c'est un meilleur chemin pour arriver à ce voisin, on l'enregistre
-                        if (!meilleursTempsVehicule.containsKey(voisin) || tempsArriveeVoisin < meilleursTempsVehicule.get(voisin)) {
-                            meilleursTempsVehicule.put(voisin, tempsArriveeVoisin);
-                            queue.add(new EtatVehicule(voisin, tempsArriveeVoisin, actuel));
-                        }
-                    }
+                double old = bestTime.getOrDefault(voisinId, Double.POSITIVE_INFINITY);
+                if (arrivalTime + 1e-12 < old) {
+                    bestTime.put(voisinId, arrivalTime);
+                    parent.put(voisinId, state.id);
+                    pq.add(new TravelState(voisinId, arrivalTime));
                 }
             }
         }
 
-        // 3. Reconstruction du chemin du point d'arrivée au point de départ
-        EtatVehicule curseur = arriveeFinale;
-        while (curseur != null) {
-            chemin.addFirst(curseur.localisation); // On ajoute au début pour l'avoir dans le bon ordre (départ -> arrivée)
-            curseur = curseur.parent;
+        if (!bestTime.containsKey(destination)) {
+            return chemin;
+        }
+
+        Long courant = destination;
+        while (courant != null) {
+            Localisation loc = localisations.get(courant);
+            if (loc == null) {
+                return new ArrayDeque<>();
+            }
+            chemin.addFirst(loc);
+            if (courant == depart) {
+                break;
+            }
+            courant = parent.get(courant);
+        }
+
+        if (chemin.isEmpty() || chemin.peekFirst().getId() != depart) {
+            return new ArrayDeque<>();
         }
 
         return chemin;
@@ -181,23 +377,5 @@ public class Graph {
             return Double.compare(this.temps, autre.temps); // Priorité au temps le plus court
         }
     }
-
-    // Classe interne pour l'Algorithme 4 (Dijkstra pour la voiture)
-    private static class EtatVehicule implements Comparable<EtatVehicule> {
-        final Localisation localisation;
-        final double temps;
-        final EtatVehicule parent; // Pour pouvoir reconstruire le chemin à la fin
-
-        EtatVehicule(Localisation localisation, double temps, EtatVehicule parent) {
-            this.localisation = localisation;
-            this.temps = temps;
-            this.parent = parent;
-        }
-
-        @Override
-        public int compareTo(EtatVehicule autre) {
-            return Double.compare(this.temps, autre.temps); // Priorité au véhicule le plus rapide
-        }
-    }
-
 }
+
