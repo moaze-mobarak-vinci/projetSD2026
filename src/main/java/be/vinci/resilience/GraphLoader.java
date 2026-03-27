@@ -6,7 +6,8 @@ import java.io.IOException;
 
 public class GraphLoader {
 
-    public static void chargerGraphe(Graph graphe, String fichierNoeuds, String fichierArcs) {
+    public static void
+    chargerGraphe(Graph graphe, String fichierNoeuds, String fichierArcs) {
 
         // 1. Lecture des Noeuds (Localisations)
         try (BufferedReader br = new BufferedReader(new FileReader(fichierNoeuds))) {
